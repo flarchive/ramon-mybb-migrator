@@ -1,0 +1,220 @@
+ramon-mybb-migrator:
+  lib:
+    errors:
+      generic: Algo deu errado. Tente novamente.
+      network: Erro de rede. Verifique a conexão e tente novamente.
+
+  admin:
+    run_failed: Não foi possível iniciar o passo de migração.
+    cancel_failed: Não foi possível concluir a ação.
+
+    tabs:
+      connection: Conexão
+      migrate: Migração
+      images: Imagens e anexos
+      compare: Comparar
+      cleanup: Avançado / limpeza
+      diag: Diagnóstico
+
+    connection:
+      title: Conexão com o banco MyBB
+      intro: >-
+        Aponte para o banco do MyBB. São as mesmas configurações que os comandos
+        de CLI usam; o painel roda exatamente a mesma migração ao fundo.
+      save_failed: Não foi possível salvar a conexão.
+      test_failed: Não foi possível testar a conexão.
+      test: Testar conexão
+      save: Salvar
+      saved: Conexão salva.
+      test_ok: Conectado ao MyBB — conexão salva e já usada pela migração.
+      test_fail: Falha na conexão
+      password_set: "(inalterada — deixe em branco para manter)"
+      password_empty: "(sem senha)"
+      php_binary: Binário PHP (opcional)
+      php_auto: Usa o PHP do Flarum
+      php_from_flarum: mesmo PHP do Flarum
+      php_override: caminho manual
+      php_none: Não foi possível determinar o PHP do Flarum — informe o caminho manualmente.
+      old_site_url: URL do site antigo (para a aba Comparar)
+      old_site_hint: "URL base do fórum MyBB no ar, ex.: https://exemplo.com — usada para abrir/pré-visualizar o post original."
+      fields:
+        host: Host
+        port: Porta
+        user: Usuário
+        password: Senha
+        db: Banco de dados
+        prefix: Prefixo das tabelas
+
+    preflight:
+      title: Pré-checagem
+      legacy_table: "Tabela de senhas legadas (rode: php flarum migrate)"
+      steps_table: Tabela de status da migração
+      extensions: Extensões-alvo
+      required: obrigatória
+
+    progress:
+      title: Progresso (MyBB → Flarum)
+      loading: Contando as linhas dos dois lados…
+      recount: Recontar
+      measured_at: "medido às {time}"
+      of_total: "{done} de {total} ({pct}%)"
+      scanned: "{done} processados"
+      no_source: Contagens de origem indisponíveis — teste a conexão primeiro.
+      entity:
+        users: Usuários
+        discussions: Discussões
+        posts: Posts
+        tags: Tags
+
+    run:
+      title: Ordem recomendada de migração
+      intro: >-
+        Rode de cima para baixo. A ordem é exigida pelas dependências de IDs /
+        chaves estrangeiras — grupos antes de usuários, usuários e tags antes do
+        conteúdo, conteúdo antes de curtidas/menções/etc. Rode uma fase inteira
+        ou passos individuais.
+      phase1: Rodar Fase 1
+      phase2: Rodar Fase 2
+      all: Rodar Fase 1 + 2
+      running: "Executando: {step}…"
+      cancel: Cancelar
+      all_done: Todos os passos desta sequência já foram concluídos — nada a rodar. Use “Resetar” em um passo para rodá-lo de novo.
+
+    phases:
+      "0":
+        title: "Fase 0 — Preparação (opcional)"
+        desc: Limpa o conteúdo atual do Flarum para recomeçar (mantém schema, grupos base e configurações). Destrutivo.
+      "1":
+        title: "Fase 1 — Núcleo (a ordem importa)"
+        desc: "Grupos → Usuários → Avatares → Tags → Conteúdo → Curtidas → Permissões → Permissões de fórum. IDs e chaves estrangeiras dependem desta ordem."
+      "2":
+        title: "Fase 2 — Conteúdo secundário"
+        desc: "Roda depois que usuários e conteúdo existem: inscrições, mensagens privadas, enquetes, feedback de trade, avaliações e promover seu admin."
+
+    images:
+      title: Internalização de mídia
+      intro: >-
+        Os posts migrados ainda carregam as imagens de onde elas estavam
+        hospedadas (imgur, o domínio antigo, um host de imagem morto…). Este
+        passo traz esses arquivos para o seu servidor — na mesma pasta que o
+        fof/upload usa — e reescreve os posts para apontarem para a cópia local.
+      warning: >-
+        Estes dois passos acessam a rede e consomem disco, então ficam fora do
+        “Rodar tudo”. Comece com um limite pequeno e um dry-run, olhe o fórum e
+        só então aumente o orçamento. Nada já baixado é rebaixado, e URLs mortas
+        ficam registradas para não serem retentadas.
+      hosts: URLs a internalizar
+      hosts_count: "{count} host(s)"
+      hosts_hint: >-
+        Hosts ou prefixos de URL separados por vírgula, ex.: “i.imgur.com,
+        damnfineshave.com”. Um host solto também casa com os subdomínios. A
+        detecção preenche isto com TODOS os hosts achados nos seus posts — pode
+        podar o que não quiser. Deixar vazio e marcar all-hosts no passo pega
+        tudo que é externo, inclusive hosts que ainda não aparecem em post algum.
+      limit: Imagens por execução
+      max_mb: MB totais por execução
+      max_file_mb: MB máx. por arquivo
+      attachments_dir: Pasta uploads do MyBB (opcional)
+      attachments_dir_hint: >-
+        Caminho da pasta “uploads” do MyBB. Preenchida, os anexos são copiados
+        direto do disco; vazia, são baixados pela URL do site antigo — o que só
+        funciona enquanto os anexos forem públicos lá.
+      directory: Os arquivos são gravados em
+      detect: Detectar automaticamente
+      detect_failed: A detecção automática falhou.
+      detect_result: "{hosts} host(s) aplicados — {images} imagens em {scanned} posts varridos"
+      detect_show_all: "Mostrar os outros {count} host(s)"
+      detect_sample: (amostra)
+      detect_uploads_ok: Pasta uploads do MyBB encontrada
+      detect_uploads_none: >-
+        Não achei a pasta uploads do MyBB perto desta instalação — informe o
+        caminho à mão se você a tiver; sem ela os anexos caem no download pelo
+        site antigo.
+      discussion: Internalizar uma discussão
+      discussion_run: Internalizar esta discussão
+      discussion_hint: >-
+        Cole a URL da discussão (ou só o id). Só as imagens dela são baixadas, sem
+        teto por execução — é o jeito mais barato de ver o resultado antes de
+        soltar a varredura completa. Roda em segundo plano, com barra de progresso.
+      save: Salvar configurações de mídia
+      saved: Configurações de mídia salvas.
+      no_fof_upload: >-
+        A extensão fof/upload não está instalada. Os arquivos são baixados e os
+        posts passam a apontar para a cópia local do mesmo jeito — eles só não
+        aparecem no gerenciador de mídia. Instale e habilite o fof/upload e rode
+        o passo de novo para registrá-los.
+      no_map_table: >-
+        A tabela mybb_migrated_images não existe — rode “php flarum migrate”
+        antes de usar estes passos.
+      stats:
+        images_ok: Imagens internalizadas
+        images_failed: Imagens com falha
+        attachments_ok: Anexos migrados
+        attachments_failed: Anexos com falha
+        disk: Disco usado
+
+    compare:
+      title: Comparar formatação (antigo × Flarum)
+      intro: Informe o ID de um post (mesmo id dos dois lados — os IDs são preservados) para comparar o post original do MyBB com o renderizado no Flarum.
+      pid_placeholder: ID do post
+      compare: Comparar
+      random: Post aleatório
+      old: Antigo (MyBB)
+      flarum: Flarum
+      open_old: Abrir no site antigo
+      old_unavailable: Não foi possível carregar o post antigo embutido (exige login, offline ou tema diferente). Use o link acima e o código-fonte abaixo.
+      iframe_note: Se o quadro ficar em branco, o site antigo está atrás de uma verificação anti-bot (Cloudflare) ou bloqueia incorporação — use "Abrir no site antigo" acima.
+      show_bbcode: Mostrar BBCode original
+      no_mybb: Post não encontrado na origem MyBB.
+      not_migrated: Este post ainda não foi migrado para o Flarum.
+      none_found: Nenhum post encontrado. Migre primeiro, ou informe um ID de post válido.
+      cant_embed: "O site antigo não pode ser embutido aqui (X-Frame-Options / Cloudflare). Abra em nova aba para comparar com o render do Flarum e o BBCode de origem abaixo."
+      bbcode_label: BBCode original (origem MyBB)
+      from_db: Renderizado do banco (aproximação do MyBB)
+      from_site: Do site antigo no ar
+      failed: Não foi possível carregar a comparação.
+
+    cleanup:
+      warning: >-
+        São passagens de fidelidade específicas dos dados. Algumas são opostas
+        entre si — não rode todas às cegas. Faça as Fases 1–2 primeiro, olhe o
+        fórum e aplique só o que precisar.
+
+    status:
+      pending: Pendente
+      running: Executando
+      done: Concluído
+      failed: Falhou
+      skipped: Ignorado
+      stale: Travado?
+
+    steps:
+      run: Rodar
+      dry_run: Simular
+      dangerous: destrutivo
+      manual: manual — rode individualmente
+      warnings: "{count} aviso(s) — itens já populados foram pulados; nada parou:"
+      warnings_more: "… e mais {count}"
+      show_log: Log
+      hide_log: Ocultar log
+      reset: Resetar
+      confirm_dangerous: "Rodar {name}? Esta ação é destrutiva."
+      desc:
+        wipe: Limpa o conteúdo do Flarum para recomeçar (mantém schema, grupos base e configurações).
+        groups: Grupos personalizados (gid≥8), IDs preservados.
+        users: Usuários (uid=id), captura senhas, mapeia papéis.
+        avatars: Preenche users.avatar_url.
+        tags: Fóruns → tags (fid=id) + hierarquia.
+        content: Tópicos → discussões, posts → posts, BBCode→Flarum, menções.
+        likes: Curtidas de posts.
+        permissions: Permissões padrão + de grupos personalizados.
+        forum-perms: Restrições de visualização por fórum → permissões de tag.
+        subscriptions: Acompanhamentos de tópico/fórum.
+        messages: Mensagens privadas → fof/byobu.
+        polls: Enquetes + votos → fof/polls.
+        trade-feedback: Feedback do iTrader → traderfeedback.
+        reviews: Avaliações da comunidade → traderfeedback.
+        make-admin: Promove sua conta a Admin (informe o usuário).
+        images: Baixa as imagens remotas usadas pelos posts migrados e reaponta os posts para a cópia local. Pula URLs já internalizadas; lembra as mortas.
+        attachments: Migra os anexos dos posts do MyBB para o armazenamento local e os acrescenta aos posts migrados.
+        legacy-passwords: Preenche mybb_legacy_passwords para usuários já existentes (leva as senhas do MyBB a um Flarum já migrado). Pula quem já tem linha.
