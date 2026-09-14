@@ -1,0 +1,166 @@
+name: CI
+
+# Mesmo formato dos demais repositórios ramon/*. Os jobs abaixo são só os que esta
+# extensão tem como executar: um passo que roda contra algo inexistente não é
+# cobertura, é um X vermelho que ensina a ignorar X vermelhos. Por isso não há
+# job de PHPStan nem de testes de integração — esta extensão só tem a suíte
+# `Unit` do PHPUnit e o bundle JS de admin (js/src/admin → js/dist/admin.js).
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+  # Segunda 05:00 UTC. Como as dependências são resolvidas com `composer update`,
+  # o agendamento testa contra o flarum/core mais recente e detecta quebras
+  # trazidas por novas versões antes que cheguem a você.
+  schedule:
+    - cron: '0 5 * * 1'
+
+# Evita empilhar execuções redundantes para o mesmo PR ou branch.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # O Packagist devolve 502 intermitente em objetos isolados do CDN — sempre o
+  # mesmo arquivo, por minutos, enquanto o resto do repositório responde 200. Abrir
+  # 12 conexões simultâneas (o padrão) contra uma borda nesse estado multiplica a
+  # chance de topar com ela; uma de cada vez é mais lento e chega ao fim.
+  COMPOSER_MAX_PARALLEL_HTTP: '6'
+
+# Default-deny do GITHUB_TOKEN; cada job declara o que precisa.
+permissions: {}
+
+jobs:
+  php:
+    name: PHP ${{ matrix.php }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # Piso do flarum/core 2.x até a versão estável mais recente.
+        php: ['8.3', '8.4', '8.5']
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40  # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Setup PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Validar composer.json
+        run: composer validate --strict --no-check-publish
+
+      - name: Lint PHP (php -l)
+        run: |
+          set -euo pipefail
+          mapfile -d '' files < <(find src migrations extend.php -name '*.php' -print0 2>/dev/null)
+          [ "${#files[@]}" -gt 0 ] || { echo "Nenhum arquivo PHP encontrado"; exit 1; }
+          printf '%s\0' "${files[@]}" | xargs -0 -n1 -P4 php -l
+
+      # `composer update`, não `install`: o composer.lock NÃO é versionado neste
+      # repositório (está no .gitignore), então cada execução resolve as
+      # dependências do zero — é isso que permite a perna 8.3 da matriz instalar
+      # e que o agendamento semanal teste contra o flarum/core mais recente.
+      - name: Cache do composer
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cache/composer
+          key: composer-${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.json') }}
+          restore-keys: composer-${{ runner.os }}-php${{ matrix.php }}-
+
+      # Retry longo porque a falha é do Packagist, não do commit: um 502 de borda
+      # persiste por minutos no mesmo objeto. Três tentativas em 60s não bastaram.
+      - name: Instalar dependências PHP
+        run: |
+          backoff=(15 30 60 120)
+          for i in 0 1 2 3 4; do
+            composer update --no-interaction --no-progress --prefer-dist && exit 0
+            [ "$i" -eq 4 ] && break
+            echo "::warning::composer falhou (tentativa $((i+1))/5), repetindo em ${backoff[$i]}s"
+            sleep "${backoff[$i]}"
+          done
+          echo "::error::composer não resolveu as dependências em 5 tentativas (~3,75 min). Se o log acusa 502 do repo.packagist.org, é incidente upstream — reexecute o job."
+          exit 1
+
+      # O testsuite chama-se `Unit` (maiúsculo), exatamente como no phpunit.xml —
+      # o PHPUnit diferencia maiúsculas e um nome errado simplesmente não
+      # executa teste nenhum.
+      - name: Testes unitários (PHPUnit)
+        run: vendor/bin/phpunit --testsuite Unit
+
+  js:
+    name: JS
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@b09bb98e06d4d774595224525879c09bc6e98c40  # v2.20.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Setup PHP (typings do core)
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240  # v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache do composer
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cache/composer
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.json') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Instalar dependências PHP
+        run: |
+          backoff=(15 30 60 120)
+          for i in 0 1 2 3 4; do
+            composer update --no-interaction --no-progress --prefer-dist --no-scripts && exit 0
+            [ "$i" -eq 4 ] && break
+            echo "::warning::composer falhou (tentativa $((i+1))/5), repetindo em ${backoff[$i]}s"
+            sleep "${backoff[$i]}"
+          done
+          echo "::error::composer não resolveu as dependências em 5 tentativas (~3,75 min). Se o log acusa 502 do repo.packagist.org, é incidente upstream — reexecute o job."
+          exit 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: js/package-lock.json
+
+      - name: Instalar dependências JS
+        working-directory: js
+        run: npm ci
+
+      - name: Verificar formatação (Prettier)
+        working-directory: js
+        run: npm run format-check
+
+      - name: Type-check (TypeScript)
+        working-directory: js
+        run: npm run check-typings
+
+      - name: Build (webpack production)
+        working-directory: js
+        run: npm run build
