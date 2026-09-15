@@ -1,0 +1,22 @@
+{
+  "name": "@ramon/mybb-migrator",
+  "description": "Admin migration console for the MyBB Migrator Flarum extension.",
+  "license": "MIT",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "flarum-tsconfig": "^2.0.0",
+    "flarum-webpack-config": "^3.0.0",
+    "prettier": "^3.9.6",
+    "typescript": "^6.0.3",
+    "webpack": "^5.110.3",
+    "webpack-cli": "^7.2.3"
+  },
+  "scripts": {
+    "dev": "webpack --mode development --watch",
+    "build": "webpack --mode production",
+    "check-typings": "tsc --noEmit --emitDeclarationOnly false",
+    "format": "prettier --write src",
+    "format-check": "prettier --check src"
+  }
+}

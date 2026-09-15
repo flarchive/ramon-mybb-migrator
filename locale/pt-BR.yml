@@ -1,0 +1,425 @@
+ramon-mybb-migrator:
+  lib:
+    errors:
+      generic: Algo deu errado. Tente novamente.
+      network: Erro de rede. Verifique a conexão e tente novamente.
+
+  admin:
+    run_failed: Não foi possível iniciar o passo de migração.
+    cancel_failed: Não foi possível concluir a ação.
+
+    tabs:
+      connection: Conexão
+      migrate: Migração
+      images: Imagens e anexos
+      compare: Comparar
+      cleanup: Avançado / limpeza
+      diag: Diagnóstico
+
+    connection:
+      title: Conexão com o banco MyBB
+      intro: >-
+        Aponte para o banco do MyBB. São as mesmas configurações que os comandos
+        de CLI usam; o painel roda exatamente a mesma migração ao fundo.
+      save_failed: Não foi possível salvar a conexão.
+      test_failed: Não foi possível testar a conexão.
+      test: Testar conexão
+      save: Salvar
+      saved: Conexão salva.
+      test_ok: Conectado ao MyBB — conexão salva e já usada pela migração.
+      test_fail: Falha na conexão
+      password_set: "(inalterada — deixe em branco para manter)"
+      password_empty: "(sem senha)"
+      php_binary: Binário PHP (opcional)
+      php_auto: Usa o PHP do Flarum
+      php_from_flarum: mesmo PHP do Flarum
+      php_override: caminho manual
+      php_none: Não foi possível determinar o PHP do Flarum — informe o caminho manualmente.
+      old_site_url: URL do site antigo (para a aba Comparar)
+      old_site_hint: "URL base do fórum MyBB no ar, ex.: https://exemplo.com — usada para abrir/pré-visualizar o post original."
+      cli_locale: Idioma da saída no console (opcional)
+      cli_locale_hint: >-
+        Idioma da saída dos passos de migração mostrada no console abaixo. Vazio
+        segue o idioma padrão do fórum — preencha só para registrar o log em
+        outro idioma (qualquer um instalado, ex.: pt-BR). Uma execução avulsa
+        pode trocar com --locale=xx.
+      fields:
+        host: Host
+        port: Porta
+        user: Usuário
+        password: Senha
+        db: Banco de dados
+        prefix: Prefixo das tabelas
+
+    preflight:
+      title: Pré-checagem
+      legacy_table: "Tabela de senhas legadas (rode: php flarum migrate)"
+      steps_table: Tabela de status da migração
+      extensions: Extensões-alvo
+      required: obrigatória
+
+    progress:
+      title: Progresso (MyBB → Flarum)
+      loading: Contando as linhas dos dois lados…
+      recount: Recontar
+      measured_at: "medido às {time}"
+      of_total: "{done} de {total} ({pct}%)"
+      scanned: "{done} processados"
+      no_source: Contagens de origem indisponíveis — teste a conexão primeiro.
+      entity:
+        users: Usuários
+        discussions: Discussões
+        posts: Posts
+        tags: Tags
+
+    run:
+      title: Ordem recomendada de migração
+      intro: >-
+        Rode de cima para baixo. A ordem é exigida pelas dependências de IDs /
+        chaves estrangeiras — grupos antes de usuários, usuários e tags antes do
+        conteúdo, conteúdo antes de curtidas/menções/etc. Rode uma fase inteira
+        ou passos individuais.
+      phase1: Rodar Fase 1
+      phase2: Rodar Fase 2
+      all: Rodar Fase 1 + 2
+      running: "Executando: {step}…"
+      cancel: Cancelar
+      all_done: Todos os passos desta sequência já foram concluídos — nada a rodar. Use “Resetar” em um passo para rodá-lo de novo.
+
+    phases:
+      "0":
+        title: "Fase 0 — Preparação (opcional)"
+        desc: Limpa o conteúdo atual do Flarum para recomeçar (mantém schema, grupos base e configurações). Destrutivo.
+      "1":
+        title: "Fase 1 — Núcleo (a ordem importa)"
+        desc: "Grupos → Usuários → Avatares → Tags → Conteúdo → Curtidas → Permissões → Permissões de fórum. IDs e chaves estrangeiras dependem desta ordem."
+      "2":
+        title: "Fase 2 — Conteúdo secundário"
+        desc: "Roda depois que usuários e conteúdo existem: inscrições, mensagens privadas, enquetes, feedback de trade, avaliações e promover seu admin."
+
+    images:
+      title: Internalização de mídia
+      intro: >-
+        Os posts migrados ainda carregam as imagens de onde elas estavam
+        hospedadas (imgur, o domínio antigo, um host de imagem morto…). Este
+        passo traz esses arquivos para o seu servidor — na mesma pasta que o
+        fof/upload usa — e reescreve os posts para apontarem para a cópia local.
+      warning: >-
+        Estes dois passos acessam a rede e consomem disco, então ficam fora do
+        “Rodar tudo”. Comece com um limite pequeno e um dry-run, olhe o fórum e
+        só então aumente o orçamento. Nada já baixado é rebaixado, e URLs mortas
+        ficam registradas para não serem retentadas. Host que recusa por excesso
+        de requisições (HTTP 429) ou que estoura o tempo é outro caso: essas URLs
+        só ficam ADIADAS, e a execução seguinte as tenta de novo sozinha.
+      hosts: URLs a internalizar
+      hosts_count: "{count} host(s)"
+      hosts_hint: >-
+        Hosts ou prefixos de URL separados por vírgula, ex.: “i.imgur.com,
+        forum-antigo.exemplo.com”. Um host solto também casa com os subdomínios. A
+        detecção preenche isto com TODOS os hosts achados nos seus posts — pode
+        podar o que não quiser. Deixar vazio e marcar all-hosts no passo pega
+        tudo que é externo, inclusive hosts que ainda não aparecem em post algum.
+      limit: Imagens por execução
+      max_mb: MB totais por execução
+      max_file_mb: MB máx. por arquivo
+      optimize: Otimização na importação
+      optimize_hint: >-
+        Imagem de fórum antigo é JPEG de câmera: 3000 px e 2 MB para ser exibida
+        a 700 px. Reencodar na entrada corta tipicamente 80-90% do disco que ela
+        ocuparia, e esta é a única hora barata de fazer isso — depois, mudar o
+        formato das imagens significa reescrever o XML de milhares de posts. O
+        que pioraria (GIF animado, SVG, AVIF, ou resultado que não ficou menor)
+        é gravado exatamente como foi baixado.
+      optimize_on: Reencodar as imagens
+      webp: Converter para WebP
+      no_webp_support: >-
+        Este PHP não tem suporte a WebP (GD sem libwebp); as imagens são
+        otimizadas no formato de origem.
+      quality: Qualidade (30-100)
+      max_dim: Maior lado (px, 0 = manter)
+      host_delay: Intervalo por host (ms)
+      retries: Retentativas em 429/timeout
+      host_delay_hint: >-
+        Espaçamento entre requisições ao MESMO host e quantas vezes um download
+        recusado ou lento é retentado (com backoff, respeitando o Retry-After).
+        Aumente o intervalo se o imgur insistir em HTTP 429.
+      exit_ips: IPs de saída / proxies (opcional)
+      exit_ips_hint: >-
+        Um por linha. Os downloads saem por esses endereços em rodízio, e o
+        limite de requisições passa a ser contado por host E por IP — cada
+        endereço tem a sua cota no imgur em vez de todos dividirem uma só. Um IP
+        puro (203.0.113.9) fixa o endereço de ORIGEM da conexão e exige que esse
+        IP esteja configurado neste servidor; um endereço com esquema ou porta
+        (socks5://host:1080, usuario:senha@host:8080) é usado como PROXY. Vazio,
+        os downloads saem pelo IP do próprio servidor.
+      imgur_client_id: Client-ID da API do imgur (opcional)
+      imgur_daily_cap: Chamadas à API por dia
+      imgur_used_today: "{used} de {cap} chamadas à API usadas hoje (UTC)"
+      imgur_hint: >-
+        Registre uma aplicação gratuita em api.imgur.com/oauth2/addclient e cole
+        o Client-ID aqui. Com ele, cada imagem do imgur é resolvida por UMA
+        chamada autenticada que devolve o link direto certo, em vez de até cinco
+        chutes em i.imgur.com que levam limite de requisições (HTTP 429). O
+        imgur concede cerca de 12.500 chamadas por dia por aplicação; o teto ao
+        lado (padrão 10.000) faz o run parar de chamar a API antes disso, e o
+        contador persiste entre runs — o que sobrar fica adiado para o dia
+        seguinte. Baixar a imagem em si não conta. A API do imgur não responde
+        por IPv6, então essas chamadas são forçadas a IPv4.
+      attachments_dir: Pasta uploads do MyBB (opcional)
+      attachments_dir_hint: >-
+        Caminho da pasta “uploads” do MyBB. Preenchida, os anexos são copiados
+        direto do disco; vazia, são baixados pela URL do site antigo — o que só
+        funciona enquanto os anexos forem públicos lá.
+      directory: Os arquivos são gravados em
+      detect: Detectar automaticamente
+      detect_failed: A detecção automática falhou.
+      detect_result: "{hosts} host(s) aplicados — {images} imagens em {scanned} posts varridos"
+      detect_show_all: "Mostrar os outros {count} host(s)"
+      detect_sample: (amostra)
+      detect_uploads_ok: Pasta uploads do MyBB encontrada
+      detect_uploads_none: >-
+        Não achei a pasta uploads do MyBB perto desta instalação — informe o
+        caminho à mão se você a tiver; sem ela os anexos caem no download pelo
+        site antigo.
+      discussion: Internalizar uma discussão
+      discussion_run: Internalizar esta discussão
+      discussion_hint: >-
+        Cole a URL da discussão (ou só o id). Só as imagens dela são baixadas, sem
+        teto por execução — é o jeito mais barato de ver o resultado antes de
+        soltar a varredura completa. Roda em segundo plano, com barra de progresso.
+      save: Salvar configurações de mídia
+      saved: Configurações de mídia salvas.
+      no_fof_upload: >-
+        A extensão fof/upload não está instalada. Os arquivos são baixados e os
+        posts passam a apontar para a cópia local do mesmo jeito — eles só não
+        aparecem no gerenciador de mídia. Instale e habilite o fof/upload e rode
+        o passo de novo para registrá-los.
+      no_map_table: >-
+        A tabela mybb_migrated_images não existe — rode “php flarum migrate”
+        antes de usar estes passos.
+      stats:
+        images_ok: Imagens internalizadas
+        images_failed: Imagens com falha
+        deferred: Adiadas (429/timeout)
+        attachments_ok: Anexos migrados
+        attachments_failed: Anexos com falha
+        disk: Disco usado
+
+    compare:
+      title: Comparar formatação (antigo × Flarum)
+      intro: Informe o ID de um post (mesmo id dos dois lados — os IDs são preservados) para comparar o post original do MyBB com o renderizado no Flarum.
+      pid_placeholder: ID do post
+      compare: Comparar
+      random: Post aleatório
+      old: Antigo (MyBB)
+      flarum: Flarum
+      open_old: Abrir no site antigo
+      old_unavailable: Não foi possível carregar o post antigo embutido (exige login, offline ou tema diferente). Use o link acima e o código-fonte abaixo.
+      iframe_note: Se o quadro ficar em branco, o site antigo está atrás de uma verificação anti-bot (Cloudflare) ou bloqueia incorporação — use "Abrir no site antigo" acima.
+      show_bbcode: Mostrar BBCode original
+      no_mybb: Post não encontrado na origem MyBB.
+      not_migrated: Este post ainda não foi migrado para o Flarum.
+      none_found: Nenhum post encontrado. Migre primeiro, ou informe um ID de post válido.
+      cant_embed: "O site antigo não pode ser embutido aqui (X-Frame-Options / Cloudflare). Abra em nova aba para comparar com o render do Flarum e o BBCode de origem abaixo."
+      bbcode_label: BBCode original (origem MyBB)
+      from_db: Renderizado do banco (aproximação do MyBB)
+      from_site: Do site antigo no ar
+      failed: Não foi possível carregar a comparação.
+
+    cleanup:
+      warning: >-
+        São passagens de fidelidade específicas dos dados. Algumas são opostas
+        entre si — não rode todas às cegas. Faça as Fases 1–2 primeiro, olhe o
+        fórum e aplique só o que precisar.
+
+    status:
+      pending: Pendente
+      running: Executando
+      done: Concluído
+      failed: Falhou
+      skipped: Ignorado
+      stale: Travado?
+
+    steps:
+      run: Rodar
+      dry_run: Simular
+      dangerous: destrutivo
+      manual: manual — rode individualmente
+      warnings: "{count} aviso(s) — itens já populados foram pulados; nada parou:"
+      warnings_more: "… e mais {count}"
+      show_log: Log
+      hide_log: Ocultar log
+      reset: Resetar
+      confirm_dangerous: "Rodar {name}? Esta ação é destrutiva."
+      desc:
+        wipe: Limpa o conteúdo do Flarum para recomeçar (mantém schema, grupos base e configurações).
+        groups: Grupos personalizados (gid≥8), IDs preservados.
+        users: Usuários (uid=id), captura senhas, mapeia papéis.
+        avatars: Preenche users.avatar_url.
+        tags: Fóruns → tags (fid=id) + hierarquia.
+        content: Tópicos → discussões, posts → posts, BBCode→Flarum, menções.
+        likes: Curtidas de posts.
+        permissions: Permissões padrão + de grupos personalizados.
+        forum-perms: Restrições de visualização por fórum → permissões de tag.
+        subscriptions: Acompanhamentos de tópico/fórum.
+        messages: Mensagens privadas → fof/byobu.
+        polls: Enquetes + votos → fof/polls.
+        trade-feedback: Feedback do iTrader → traderfeedback.
+        reviews: Avaliações da comunidade → traderfeedback.
+        make-admin: Promove sua conta a Admin (informe o usuário).
+        images: Baixa as imagens remotas usadas pelos posts migrados e reaponta os posts para a cópia local. Pula URLs já internalizadas; lembra as mortas.
+        attachments: Migra os anexos dos posts do MyBB para o armazenamento local e os acrescenta aos posts migrados.
+        optimize-media: Reencoda o que já foi internalizado (WebP + redimensionamento), reaponta os posts e o gerenciador de mídia para o arquivo novo e só então apaga o antigo. Para o que foi migrado antes de a otimização existir.
+        optimize-media-all: TODAS as imagens do fórum numa passada — arquivos internalizados, arquivos em disco sem linha no mapa e avatares. O que já está otimizado não custa nada (não rende ganho e fica intacto), então dá para rodar de novo à vontade.
+        legacy-passwords: Preenche mybb_legacy_passwords para usuários já existentes (leva as senhas do MyBB a um Flarum já migrado). Pula quem já tem linha.
+
+  # Saída dos comandos `mybb:*` — é ela que aparece no console do painel.
+  cli:
+    common:
+      force_required: "Rode com --force."
+      done: Concluído.
+      dry_run_done: Dry-run concluído.
+      dry_run: "*** DRY-RUN — nada será baixado nem gravado ***"
+      unknown_error: erro desconhecido
+      map_missing: "Tabela mybb_migrated_images ausente — rode `php flarum migrate`. Detalhe: {error}"
+      map_write_failed: "  não foi possível gravar o mapa para {key}: {error}"
+      line_destination: "Destino : {path}"
+      line_limits: "Limites : {limits}"
+      line_network: "Rede    : {summary}"
+      line_optimize: "Otimiza : {summary}"
+      line_scope: "Escopo  : {scope}"
+      limit_volume: "{count} MB"
+      limit_volume_none: sem limite de volume
+      limit_per_file: "{count} MB por arquivo"
+      network_summary: "{retries} retentativa(s) em falha transitória, {delay} ms entre requisições ao mesmo host, {timeout}s sem tráfego para desistir"
+      retrying: "↻ {url} — {error} · retentativa {attempt}/{of} em {wait}s"
+      retrying_via: "↻ {url} — {error} · por {exit} · retentativa {attempt}/{of} em {wait}s"
+      exit_down: "⚠ IP de saída {exit} saiu do rodízio após falhas seguidas de conexão — {error}"
+      network_exits: "{count} IPs de saída em rodízio ({list})"
+      network_defer: "hosts inalcançáveis adiados para o fim do run"
+      network_insecure: "⚠ verificação de certificado TLS DESLIGADA (--insecure)"
+      network_imgur: "API do imgur ligada ({used}/{cap} chamadas usadas hoje)"
+      network_imgur_uncapped: "API do imgur ligada ({used} chamadas hoje, sem teto)"
+      notice_host_tripped: "⛔ {host} não está respondendo ({error}) — as demais URLs dele são puladas neste run e retentadas no fim"
+      notice_imgur_cap: "⛔ Teto diário da API do imgur atingido ({used}/{cap}) — as URLs do imgur restantes ficam adiadas e voltam amanhã"
+      notice_imgur_remote_cap: "⛔ O imgur reporta a cota deste Client-ID como esgotada (X-RateLimit-ClientRemaining: 0, zera em ~{reset} min) — é também a resposta dele a um Client-ID desconhecido, confira; as URLs do imgur restantes ficam adiadas"
+      notice_imgur_invalid: "⛔ O imgur recusou este Client-ID (HTTP 403 “Invalid client_id” em /3/credits) — confira o valor na aba Imagens (tem de ser o Client-ID, não o Client-Secret) ou registre uma nova aplicação em api.imgur.com/oauth2/addclient; as URLs do imgur ficam adiadas neste run"
+      imgur_verified: "✓ Client-ID do imgur aceito — o imgur reporta {remaining}/{limit} chamadas à API restantes para esta aplicação hoje"
+      imgur_verify_failed: "⚠ não foi possível verificar o Client-ID do imgur ({error}) — seguindo assim mesmo"
+      optimizer_disabled: desligada
+      optimizer_unavailable: "indisponível (sem GD) — arquivos gravados como vieram"
+      optimizer_summary: "{format}, qualidade {quality}, máx {size}, ganho mínimo {gain}%"
+      optimizer_format_webp: webp
+      optimizer_format_source: formato de origem
+      optimizer_format_source_no_webp: "formato de origem (este GD não tem suporte a webp)"
+      optimizer_max_pixels: "{pixels} px"
+      optimizer_no_resize: sem redimensionar
+      optimized: "  ↓ {name} {note}"
+      optimized_url: "  ↓ {note}"
+      stats:
+        optimized: imagens otimizadas
+        saved: MB poupados otimizando
+        failed: falhas
+        deferred: adiadas (429/timeout)
+
+    images:
+      discussion_unresolved: "Não consegui extrair o id da discussão de \"{value}\". Cole a URL inteira (.../d/1661-titulo) ou informe só o número."
+      detecting_hosts: "Nenhum host configurado — detectando a partir dos posts migrados…"
+      no_external_images: "Nenhuma imagem externa encontrada nos posts varridos. Nada a internalizar (ou o conteúdo ainda não foi migrado)."
+      hosts_applied: "  {hosts} host(s) aplicados, {images} imagens em {scanned} posts varridos{sample}."
+      sample_suffix: (amostra)
+      hosts_more: "    … e mais {count} host(s), todos incluídos. A lista completa está na aba \"Imagens\"."
+      restricted: "  restrito: {path}  (imagens de discussão invisível ao visitante nascem AQUI, nunca no público)"
+      line_hosts: "Hosts   : {hosts}"
+      hosts_all: (todos os externos)
+      limit_downloads: "{count} downloads"
+      limit_downloads_none: sem limite de downloads
+      no_upload_table: "⚠ fof/upload não está instalado: os arquivos são gravados e apontados normalmente, só não aparecem no gerenciador de mídia. Instale e habilite o fof/upload e rode de novo para registrá-los."
+      relink_only: "*** RELINK-ONLY — sem acesso à rede ***"
+      map_known: "URLs já conhecidas no mapa: {count}"
+      scope_discussion: "discussão {id} ({count} posts com imagem)"
+      progress: "  {scanned} posts varridos, {downloaded} imagens baixadas…"
+      moved_private: "  {count} arquivo(s) movido(s) para fora do diretório público pelo escopo de tags."
+      dry_download: "  [dry-run] baixaria {url}"
+      deferred: "⏳ adiada {url} — {error}"
+      failed: "⚠ falhou {url} — {error}"
+      queued: "↪ adiada para o fim do run {url} — {error}"
+      pending_start: "⏳ Fim da varredura: retentando {count} URL(s) de {hosts} host(s) que não responderam antes…"
+      pending_done: "  {recovered} de {count} URL(s) adiadas recuperadas; o resto continua adiado para o próximo run."
+      budget_hit: "⚠ Limite do run atingido — a varredura parou antes do fim. Rode de novo (com um limite maior) para continuar de onde parou; nada já baixado é rebaixado."
+      failed_hint: "⚠ URLs que falharam ficam registradas e não são retentadas sozinhas (a maioria é imagem realmente apagada na origem). Use --retry-failed para tentar de novo."
+      deferred_hint: "⏳ {count} URL(s) adiadas por limite de requisições (429) ou lentidão do host — NÃO são imagens perdidas. Rode o passo de novo, sem --retry-failed, que elas voltam a ser tentadas; se o host insistir no 429, aumente --host-delay."
+      stats:
+        scanned: posts varridos
+        candidates: imagens candidatas
+        downloaded: imagens baixadas
+        private: gravadas fora do público
+        relinked: imagens reapontadas
+        posts: posts atualizados
+        mb: MB baixados
+        skipped_host: puladas (host de fora)
+        skipped_local: puladas (já locais)
+        skipped_failed: puladas (falha anterior)
+        queued: adiadas para o fim do run (host sem resposta)
+        recovered: recuperadas no fim do run
+
+    attachments:
+      uploads_detected: "Pasta de uploads detectada: {path}"
+      uploads_not_found: "Não encontrei a pasta uploads do MyBB. Diretórios testados: {paths}"
+      uploads_missing: "Pasta de uploads não encontrada: {path}"
+      no_source: "Sem origem para os anexos: informe a pasta de uploads do MyBB na aba \"Imagens\" (ou --uploads-dir=…), ou preencha a URL do site antigo na aba Conexão."
+      line_source: "Origem  : {source}"
+      source_local: "pasta local {path}"
+      source_download: "download em {url}"
+      restricted: "  restrito: {path}  (anexos de discussão invisível ao visitante nascem AQUI)"
+      limit_files: "{count} anexos"
+      limit_files_none: sem limite
+      optimize_images_only: (só vale para anexos de imagem)
+      no_upload_table: "⚠ fof/upload não está instalado: os anexos são gravados e linkados no post, só não aparecem no gerenciador de mídia."
+      dry_migrate: "  [dry-run] migraria aid={aid} ({file}) para o post {post}"
+      deferred: "⏳ adiado aid={aid} ({file}) — {error}"
+      failed: "⚠ falhou aid={aid} ({file}) — {error}"
+      moved_private: "  {count} anexo(s) movido(s) para fora do diretório público pelo escopo de tags."
+      unparse_failed: "  post {post}: não foi possível desmontar o conteúdo ({error}); anexo não inserido."
+      parse_failed: "  post {post}: formatter falhou ao remontar ({error}); anexo não inserido."
+      budget_hit: "⚠ Limite do run atingido — rode de novo (com um limite maior) para continuar."
+      failed_hint: "⚠ Falhas ficam registradas e não são retentadas sozinhas. Depois de corrigir a origem (--uploads-dir apontando para a pasta uploads do MyBB é o caminho confiável), rode de novo com --retry-failed."
+      deferred_hint: "⏳ {count} anexo(s) adiados por limite de requisições ou lentidão do site antigo — basta rodar o passo de novo, sem --retry-failed, que eles voltam a ser tentados."
+      stats:
+        seen: anexos no MyBB
+        copied: arquivos migrados
+        private: gravados fora do público
+        appended: posts com anexo inserido
+        already: já migrados antes
+        missing_post: post inexistente
+        mb: MB transferidos
+
+    optimize:
+      unavailable: "Otimização indisponível: este PHP não tem GD (ou --no-optimize foi passado). Nada a fazer."
+      kind_all: imagens e anexos
+      kind_image: imagens
+      kind_attachment: anexos
+      scope_limit: "(máx {count} arquivos)"
+      scope_orphans: arquivos sem linha no mapa
+      scope_avatars: avatares
+      sweep_orphans: "Arquivos em disco sem linha no mapa: {count}"
+      sweep_avatars: "Avatares: {count}"
+      limit_hit: "⚠ Limite do run atingido — rode o passo de novo para continuar; o que já foi otimizado é pulado em segundos."
+
+      dry_run: "*** DRY-RUN — nada será gravado, reapontado nem apagado ***"
+      total: "Arquivos a examinar: {count}"
+      progress: "{count} otimizados"
+      failed: "  falha ao otimizar {name}: {error}"
+      missing_hint: "⚠ Arquivos ausentes no disco continuam marcados como `ok` no mapa: são linhas cujo arquivo foi apagado por fora. Nada foi alterado neles."
+      stats:
+        seen: arquivos analisados
+        optimized: otimizados
+        renamed: renomeados (novo formato)
+        posts: posts atualizados
+        skipped: sem ganho / não aplicável
+        missing: ausentes no disco
+        avatars: avatares reapontados
+        failed: falhas
+        before: MB antes
+        after: MB depois
+        saved: economia
